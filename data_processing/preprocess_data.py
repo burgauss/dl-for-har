@@ -78,7 +78,7 @@ def load_dataset(dataset, pred_type='actions', include_null=False):
     data = pd.read_csv(os.path.join('data/', dataset + '_data.csv'), sep=',', header=None, index_col=None)
     X, y = preprocess_data(data, dataset, pred_type, has_null, include_null)
 
-    print(" ..from file {}".format(os.path.join('data/', dataset + '_data.csv')))
+    #print(" ..from file {}".format(os.path.join('data/', dataset + '_data.csv')))
 
     X = X.astype(np.float32)
 

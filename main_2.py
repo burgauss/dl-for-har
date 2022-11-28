@@ -3,10 +3,13 @@ from torch import nn
 import pandas as pd
 import warnings
 
+from data_processing.sliding_window import apply_sliding_window
+from data_processing.preprocess_data import load_dataset
 
+warnings.filterwarnings('ignore')
 
 def main():
-    pass   
+    gettinDataForTraining()
 
 
 
@@ -75,6 +78,40 @@ class DeepConvLSTM(nn.Module):
         return out[:, -1, :]
 
 
+def gettinDataForTraining():
+    # data loading (we are using a predefined method called load_dataset, which is part of the DL-ARC feature stack)
+    X, y, num_classes, class_names, sampling_rate, has_null = load_dataset('rwhar_3sbjs', include_null=True)
+    # since the method returns features and labels separatley, we need to concat them
+    data = np.concatenate((X, y[:, None]), axis=1)
+
+    # define the train data to be all data belonging to the first two subjects
+    train_data = data[data[:, 0] <= 1]
+    # define the validation data to be all data belonging to the third subject
+    valid_data = data[data[:, 0] == 2]
+
+    # settings for the sliding window (change them if you want to!)
+    sw_length = 50
+    sw_unit = 'units'
+    sw_overlap = 50
+
+    # apply a sliding window on top of both the train and validation data; you can use our predefined method
+    # you can import it via from preprocessing.sliding_window import apply_sliding_window
+    X_train, y_train = apply_sliding_window(train_data[:, :-1], train_data[:, -1], sliding_window_size=sw_length, unit=sw_unit, sampling_rate=50, sliding_window_overlap=sw_overlap)
+    X_valid, y_valid = apply_sliding_window(valid_data[:, :-1], valid_data[:, -1], sliding_window_size=sw_length, unit=sw_unit, sampling_rate=50, sliding_window_overlap=sw_overlap)
+
+    print("\nShape of the train and validation datasets after splitting and windowing: ")
+    print(X_train.shape, y_train.shape)
+    print(X_valid.shape, y_valid.shape)
+
+    # (optional) omit the first feature column (subject_identifier) from the train and validation dataset
+    X_train, X_valid = X_train[:, :, 1:], X_valid[:, :, 1:]
+
+    print("\nShape of the train and validation feature dataset after splitting and windowing: ")
+    print(X_train.shape, X_valid.shape)
+
+    # convert the features of the train and validation to float32 and labels to uint8 for GPU compatibility 
+    X_train, y_train = X_train.astype(np.float32), y_train.astype(np.uint8)
+    X_valid, y_valid = X_valid.astype(np.float32), y_valid.astype(np.uint8)
 
 if __name__ == "__main__":
     main()
