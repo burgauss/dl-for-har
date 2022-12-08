@@ -9,7 +9,7 @@ import os
 import random
 import numpy as np
 import torch
-from prettytable import PrettyTable
+#from prettytable import PrettyTable
 
 
 def seed_torch(seed):
