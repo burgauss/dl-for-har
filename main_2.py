@@ -11,24 +11,100 @@ from sklearn.model_selection import train_test_split#
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from data_processing.sliding_window import apply_sliding_window
 from data_processing.preprocess_data import load_dataset
+from misc.torchutils import seed_torch, PrettyTable
+from model.DeepConvLSTM import DeepConvLSTM
+from model.train import train
 
 warnings.filterwarnings('ignore')
 
 pathAll = "C:/Users/juan.burgos/Desktop/JuanBurgos/04 Thesis/12_DataCollection/TrainSets/Combination/WeightLog_ALL.csv"
 windowSizes = [ 102, 51, 103, 102, 102 , 101, 114]
 
+config = {
+    #### TRY AND CHANGE THESE PARAMETERS ####
+    # sliding window settings
+    'sw_length': 50,
+    'sw_unit': 'units',
+    'sampling_rate': 50,
+    'sw_overlap': 30,
+    # network settings
+    'nb_conv_blocks': 2,
+    'conv_block_type': 'normal',
+    'nb_filters': 64,
+    'filter_width': 11,
+    'nb_units_lstm': 128,
+    'nb_layers_lstm': 1,
+    'drop_prob': 0.5,
+    # training settings
+    'epochs': 10,
+    'batch_size': 100,
+    'loss': 'cross_entropy',
+    'weighted': True,
+    'weights_init': 'xavier_uniform',
+    'optimizer': 'adam',
+    'lr': 1e-4,
+    'weight_decay': 1e-6,
+    'shuffling': True,
+    ### UP FROM HERE YOU SHOULD RATHER NOT CHANGE THESE ####
+    'no_lstm': False,
+    'batch_norm': False,
+    'dilation': 1,
+    'pooling': False,
+    'pool_type': 'max',
+    'pool_kernel_width': 2,
+    'reduce_layer': False,
+    'reduce_layer_output': 10,
+    'nb_classes': 8,
+    'seed': 1,
+    'gpu': 'cuda:0',
+    'verbose': False,
+    'print_freq': 10,
+    'save_gradient_plot': False,
+    'print_counts': False,
+    'adj_lr': False,
+    'adj_lr_patience': 5,
+    'early_stopping': False,
+    'es_patience': 5,
+    'save_test_preds': False
+}
+
 
 def main():
-    dataLoader = Dataloader(pathAll)
-    dataset, waveIndexBegin, waveIndexEnding = dataLoader.processData()
+    seed_torch(config['seed'])
+
+    log_date = time.strftime('%Y%m%d')
+    log_timestamp = time.strftime('%H%M%S')
+
+    dataLoader = Dataloader(pathAll)        #get the data
+    # Data processing
+    dataset, waveIndexBegin, waveIndexEnding = dataLoader.processData() 
     X_train, X_test, y_train, y_test = getWindowedSplitData(dataset, waveIndexBegin, waveIndexEnding, tStepLeftShift=-5, tStepRightShift=15, expectedWavesSizes=windowSizes)
     X_train_ss, X_test_ss = MinMaxNormalization(X_train, X_test)             # Rescaling
     
-    print(X_train_ss[0,:], X_test_ss.shape)
+    print("X_train shape: ", X_train_ss.shape, "X_test_shape", X_test_ss.shape)
 
+    #Adding an extradimension for Pytorch
+    X_train_ss = X_train_ss.reshape((X_train_ss.shape[0], X_train_ss.shape[1], 1))
+    X_test_ss = X_test_ss.reshape((X_test_ss.shape[0], X_test_ss.shape[1], 1))
+    
+    print("X_train new shape: ", X_train_ss.shape, "y_train shape", y_train.shape)
+    # Converting data for GPU compatibality
+    X_train_ss, y_train = X_train_ss.astype(np.float32), y_train.astype(np.uint8)
+    X_test_ss, y_test = X_test_ss.astype(np.float32), y_test.astype(np.uint8)
 
+    #Adding two new parameters according to the shape of the datasets
+    config['window_size'] = X_train_ss.shape[1]
+    config['nb_channels'] = X_train_ss.shape[2]
 
+    #Calling the model
+    net = DeepConvLSTM(config=config)
 
+    loss = torch.nn.CrossEntropyLoss()
+    opt = torch.optim.Adam(net.parameters(), lr=config['lr'], weight_decay=config["weight_decay"])
+
+    train_valid_net,_, val_output, train_output = train(X_train_ss, y_train, X_test_ss, y_test,
+        network=net, optimizer=opt, loss=loss, config=config, log_date=log_date,
+        log_timestamp=log_timestamp)
 
 
 class Dataloader():
@@ -130,9 +206,9 @@ def MinMaxNormalization(X_train, X_test):
 
     return X_train_ss, X_test_ss
 
-class DeepConvLSTM(nn.Module):
+class DeepConvLSTM_Simplified(nn.Module):
     def __init__(self, config):
-        super(DeepConvLSTM, self).__init__()
+        super(DeepConvLSTM_Simplified, self).__init__()
         # parameters
         self.window_size = config['window_size']
         self.drop_prob = config['drop_prob']
@@ -265,7 +341,7 @@ def test1DLForHAR():
     config['nb_classes'] = len(class_names)
 
     # initialize your DeepConvLSTM object 
-    network = DeepConvLSTM(config)
+    network = DeepConvLSTM_Simplified(config)
 
     # sends network to the GPU and sets it to training mode
     network.to(config['gpu_name'])
