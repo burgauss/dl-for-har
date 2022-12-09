@@ -292,14 +292,18 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
     # if weighted loss chosen, calculate weights based on training dataset; else each class is weighted equally
     if config['weighted']:
         class_weights = torch.from_numpy(
-            compute_class_weight('balanced', classes=np.unique(train_labels + 1), y=train_labels + 1)).float()
+            # 09122022 In train no class 0 exists, so we comment out the next line
+            #compute_class_weight('balanced', classes=np.unique(train_labels + 1), y=train_labels + 1)).float()
+            compute_class_weight('balanced', classes=np.unique(train_labels), y=train_labels)).float()
         if config['loss'] == 'cross_entropy':
             loss.weight = class_weights.cuda()
         print('Applied weighted class weights: ')
         print(class_weights)
     else:
         class_weights = torch.from_numpy(
-            compute_class_weight(None, classes=np.unique(train_labels + 1), y=train_labels + 1)).float()
+            # 09122022 In train no class 0 exists, so we comment out the next line
+            #compute_class_weight('balanced', classes=np.unique(train_labels + 1), y=train_labels + 1)).float()
+            compute_class_weight(None, classes=np.unique(train_labels), y=train_labels)).float()
         if config['loss'] == 'cross_entropy':
             loss.weight = class_weights.cuda()
 
