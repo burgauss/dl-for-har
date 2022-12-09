@@ -7,20 +7,39 @@ import warnings
 from sklearn.metrics import precision_score, recall_score, f1_score, jaccard_score
 from misc.torchutils import seed_torch
 import time
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split#
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from data_processing.sliding_window import apply_sliding_window
 from data_processing.preprocess_data import load_dataset
 
 warnings.filterwarnings('ignore')
 
 pathAll = "C:/Users/juan.burgos/Desktop/JuanBurgos/04 Thesis/12_DataCollection/TrainSets/Combination/WeightLog_ALL.csv"
+windowSizes = [ 102, 51, 103, 102, 102 , 101, 114]
+
 
 def main():
     dataLoader = Dataloader(pathAll)
-    dataset, waveIndexBegin, waveIndexEnding= dataLoader.processData()
-    print(dataset["Bottle"].unique())
+    dataset, waveIndexBegin, waveIndexEnding = dataLoader.processData()
+    X_train, X_test, y_train, y_test = getWindowedSplitData(dataset, waveIndexBegin, waveIndexEnding, tStepLeftShift=-5, tStepRightShift=15, expectedWavesSizes=windowSizes)
+    # Rescaling
+    mm = MinMaxScaler()
+    # print("Available labels ", np.unique(y_train[:,0]))
+    X_train_flatten = X_train.flatten().reshape(-1,1)
+    X_test_flatten = X_test.flatten().reshape(-1,1)
+    mm.fit(X_train_flatten)
+    # Test to see if no weird dimmensions
+    X_train_ss = mm.transform(X_train_flatten)
+    X_train_ss = X_train_ss.reshape(len(X_train), -1)
 
-    train_test_split(dataset, 0.2, )
+    X_test_ss = mm.transform(X_test_flatten)
+    X_test_ss = X_train_ss.reshape(len(X_test), -1)
+
+    #X_train_ss = mm.fit_transform(X_train)
+    #X_test_ss = mm.transform(X_test)
+
+    #print(X_train[0], X_train_ss[0])
+
 
 
 class Dataloader():
@@ -58,25 +77,47 @@ class Dataloader():
 
         return processedDataset, waveIndexBegin, waveIndexEnding
 
-def getWindowedData(dataset, tStepLeftShift=0, tStepRightShift=0, expectedWaves=None):
+def getWindowedSplitData(dataset, waveIndexBegin, waveIndexEnding, tStepLeftShift=0, tStepRightShift=0, expectedWavesSizes=None):
     """Function determines the size of the windows for the dataset
     param dataset: pd.Dataframe
         the dataset
+    param waveIndexBegin: list
+        contains the index for the begin of the window according to the LS1ON
+    param waveIndexEnding: list
+        contains the index for the ending of the window according to the LS1ON
     param tSstepLeftShift: int
         the number of data points that to the left of LS1ON that will be taken into account
     param tStepRightShift: int
         the number of data points that to the right of LS1ON that will be taken into account
     param expectedWaves: int or list
         the number of waves per sequence, i.e., Bottle ColaHalb has 51 waves
-    return: np.array with the X_train, y_train, X_test, y_test"""
+    return: np.array with the X_train, X_test, y_train, y_test"""
 
     num_classes = dataset["Bottle"].unique()
-    npDataSet = np.array(dataset)
-    batchedDataSet = []
+    # npDataSet = np.array(dataset["Data"]).reshape((len(dataset), -1))
+    npDataSet = np.array(dataset.drop(dataset.columns[[0,3]], axis=1)).reshape((len(dataset), -1))
+    batchedTrainData = []
+    batchedLabels = []
+    windowSize = -tStepLeftShift + tStepRightShift
+    assert len(waveIndexBegin) == len(waveIndexEnding), "Lengh of indexes for begin and ending does not match"  #just as a checking
 
-    for i in range(expectedWaves):
-        batchedDataSet.append()
-        pass
+    for id, (wib, wie) in enumerate(zip(waveIndexBegin, waveIndexEnding)):
+        batchedTrainData.append((npDataSet[wib+tStepLeftShift: wib+tStepRightShift, 0]))
+        y_temp = npDataSet[wib+tStepLeftShift: wib+tStepRightShift, 1]
+        if len(np.unique(y_temp)) == 1:
+        # y_temp.unique() == 1:
+            batchedLabels.append(y_temp[0]) 
+        else:
+            raise ValueError("Hallochen!! Error")
+        #wie not use, perhaps in the future
+    
+    
+    X = np.array(batchedTrainData)
+    y = np.array(batchedLabels).reshape((len(batchedLabels), 1))
+    
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    return X_train, X_test, y_train, y_test
 
 
 class DeepConvLSTM(nn.Module):
