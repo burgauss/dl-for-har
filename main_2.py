@@ -23,23 +23,23 @@ windowSizes = [ 102, 51, 103, 102, 102 , 101, 114]
 config = {
     #### TRY AND CHANGE THESE PARAMETERS ####
     # sliding window settings
-    'sw_length': 50,
-    'sw_unit': 'units',
-    'sampling_rate': 50,
-    'sw_overlap': 30,
+    #'sw_length': 50,
+    #'sw_unit': 'units',
+    #'sampling_rate': 50,
+    #'sw_overlap': 30,
     # network settings
     'nb_conv_blocks': 2,
     'conv_block_type': 'normal',
     'nb_filters': 64,
-    'filter_width': 11,
+    'filter_width': 5,
     'nb_units_lstm': 128,
     'nb_layers_lstm': 1,
     'drop_prob': 0.5,
     # training settings
     'epochs': 10,
-    'batch_size': 100,
+    'batch_size': 10,
     'loss': 'cross_entropy',
-    'weighted': True,
+    'weighted': False,
     'weights_init': 'xavier_uniform',
     'optimizer': 'adam',
     'lr': 1e-4,
@@ -54,7 +54,7 @@ config = {
     'pool_kernel_width': 2,
     'reduce_layer': False,
     'reduce_layer_output': 10,
-    'nb_classes': 8,
+    'nb_classes': 7,
     'seed': 1,
     'gpu': 'cuda:0',
     'verbose': False,
@@ -101,11 +101,16 @@ def main():
 
     loss = torch.nn.CrossEntropyLoss()
     opt = torch.optim.Adam(net.parameters(), lr=config['lr'], weight_decay=config["weight_decay"])
-
-    train_valid_net,_, val_output, train_output = train(X_train_ss, y_train, X_test_ss, y_test,
+    # Prepare for train
+    train_valid_net,_, val_output, train_output = train_simplified(X_train_ss, y_train, X_test_ss, y_test,
         network=net, optimizer=opt, loss=loss, config=config, log_date=log_date,
         log_timestamp=log_timestamp)
 
+
+def train_simplified(X_train_ss, y_train, X_test_ss, y_test,
+        network=net, optimizer=opt, loss=loss, config=config, log_date=log_date,
+        log_timestamp=log_timestamp):
+        pass
 
 class Dataloader():
     """Following class has as responsabilities to get the data coming from the dataset.
@@ -178,7 +183,8 @@ def getWindowedSplitData(dataset, waveIndexBegin, waveIndexEnding, tStepLeftShif
     
     
     X = np.array(batchedTrainData)
-    y = np.array(batchedLabels).reshape((len(batchedLabels), 1))
+    # y = np.array(batchedLabels).reshape((len(batchedLabels), 1))
+    y = np.array(batchedLabels).reshape((len(batchedLabels), ))
     
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
