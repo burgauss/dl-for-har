@@ -22,23 +22,12 @@ def main():
     dataLoader = Dataloader(pathAll)
     dataset, waveIndexBegin, waveIndexEnding = dataLoader.processData()
     X_train, X_test, y_train, y_test = getWindowedSplitData(dataset, waveIndexBegin, waveIndexEnding, tStepLeftShift=-5, tStepRightShift=15, expectedWavesSizes=windowSizes)
-    # Rescaling
-    mm = MinMaxScaler()
-    # print("Available labels ", np.unique(y_train[:,0]))
-    X_train_flatten = X_train.flatten().reshape(-1,1)
-    X_test_flatten = X_test.flatten().reshape(-1,1)
-    mm.fit(X_train_flatten)
-    # Test to see if no weird dimmensions
-    X_train_ss = mm.transform(X_train_flatten)
-    X_train_ss = X_train_ss.reshape(len(X_train), -1)
+    X_train_ss, X_test_ss = MinMaxNormalization(X_train, X_test)             # Rescaling
+    
+    print(X_train_ss[0,:], X_test_ss.shape)
 
-    X_test_ss = mm.transform(X_test_flatten)
-    X_test_ss = X_train_ss.reshape(len(X_test), -1)
 
-    #X_train_ss = mm.fit_transform(X_train)
-    #X_test_ss = mm.transform(X_test)
 
-    #print(X_train[0], X_train_ss[0])
 
 
 
@@ -119,6 +108,27 @@ def getWindowedSplitData(dataset, waveIndexBegin, waveIndexEnding, tStepLeftShif
 
     return X_train, X_test, y_train, y_test
 
+def MinMaxNormalization(X_train, X_test):
+    """ Function performs a minmax normalization using sklearn,
+    X_train is flatten and then normalization occurs, afterwards 
+    the data is transform back to its original dimension
+    param X_train: np array
+        the X_train dataset with shape [windows, size_window]
+    param X_test: np array
+        the X_test dataset with shape [windows, size_window]
+    returns: normalize X_train_norm and X_test_norm"""
+    mm = MinMaxScaler()
+    X_train_flatten = X_train.flatten().reshape(-1,1)
+    X_test_flatten = X_test.flatten().reshape(-1,1)
+    mm.fit(X_train_flatten)
+    # Test to see if no weird dimmensions
+    X_train_ss = mm.transform(X_train_flatten)
+    X_train_ss = X_train_ss.reshape(len(X_train), -1)
+
+    X_test_ss = mm.transform(X_test_flatten)
+    X_test_ss = X_test_ss.reshape(len(X_test), -1)
+
+    return X_train_ss, X_test_ss
 
 class DeepConvLSTM(nn.Module):
     def __init__(self, config):
