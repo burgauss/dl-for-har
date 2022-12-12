@@ -104,12 +104,16 @@ def main():
     opt = torch.optim.Adam(net.parameters(), lr=config['lr'], weight_decay=config["weight_decay"])
     
     ## Prepare for train
-    net = train_simplified(X_train_ss, y_train, X_test_ss, y_test,
-       network=net, optimizer=opt, loss=loss, config=config, log_date=log_date,
-       log_timestamp=log_timestamp)
+    # net = train_simplified(X_train_ss, y_train, X_test_ss, y_test,
+    #    network=net, optimizer=opt, loss=loss, config=config, log_date=log_date,
+    #    log_timestamp=log_timestamp)
+    # net = train_validate_simplified(X_train_ss, y_train, X_test_ss, y_test,
+    #    network=net, optimizer=opt, loss=loss, config=config, log_date=log_date,
+    #    log_timestamp=log_timestamp)
     
-    torch.save(net.state_dict(), './model1.pth')
+    # torch.save(net.state_dict(), './model1.pth')
 
+    
     # Quick validation
 
     # net.load_state_dict(torch.load('model1.pth'))
@@ -121,9 +125,9 @@ def main():
     # print(myLabel)
     # #prediction = net(mySampleNew)
     # #print(prediction)
-    # #test1DLForHAR()
+    #test1DLForHAR()
 
-
+    validation_simplified(X_test_ss, y_test, mm)
 
 def train_simplified(train_features, train_labels, val_features, val_labels,
         network, optimizer, loss, config, log_date, log_timestamp):
@@ -252,7 +256,96 @@ def train_validate_simplified(train_features, train_labels, val_features, val_la
                 start_time = time.time()
             batch_num += 1
 
-    return network
+        val_preds = []
+        val_gt = []
+        val_losses = []
+
+        network.eval()
+        with torch.no_grad():
+            # iterate over the valloader object
+            for i, (x, y) in enumerate(valLoader):
+                #again prepare to use GPU
+                inputs, targets = x.to(config['gpu']), y.to(config['gpu'])
+
+                #send inputs through network to get predictions
+                val_output = network(inputs)
+                
+                #calculates loss by passing criterion both predictions and true labels
+                val_loss = criterion(val_output, targets)
+
+                #Calculate actual prediction (i.e. softmax probabilities)
+                val_output = torch.nn.functional.softmax(val_output, dim=1)
+
+                #appends validation loss to list
+                val_losses.append(val_loss.item())
+
+                # create predictions and true labels; appends them to the final lists
+                y_preds = np.argmax(val_output.cpu().numpy(), axis=-1)
+                y_true = targets.cpu().numpy().flatten()
+                val_preds = np.concatenate((np.array(val_preds, int), np.array(y_preds, int)))
+                val_gt = np.concatenate((np.array(val_gt, int), np.array(y_true, int)))
+
+            print("\nEPOCH: {}/{}".format(e + 1, config['epochs']),
+                "\nTrain Loss: {:.4f}".format(np.mean(train_losses)),
+                "Train Acc: {:.4f}".format(jaccard_score(train_gt, train_preds, average='macro')),
+                "Train Prec: {:.4f}".format(precision_score(train_gt, train_preds, average='macro')),
+                "Train Rcll: {:.4f}".format(recall_score(train_gt, train_preds, average='macro')),
+                "Train F1: {:.4f}".format(f1_score(train_gt, train_preds, average='macro')),
+                "\nVal Loss: {:.4f}".format(np.mean(val_losses)),
+                "Val Acc: {:.4f}".format(jaccard_score(val_gt, val_preds, average='macro')),
+                "Val Prec: {:.4f}".format(precision_score(val_gt, val_preds, average='macro')),
+                "Val Rcll: {:.4f}".format(recall_score(val_gt, val_preds, average='macro')),
+                "Val F1: {:.4f}".format(f1_score(val_gt, val_preds, average='macro')))
+        
+        network.train()
+
+def validation_simplified(val_features, val_labels, scaler):
+    """Function gets a saved model and takes one batch to make predictions
+    params val_features: np.array
+    params val_labels: np.array
+    """
+    #upload the model
+    net = DeepConvLSTM_Simplified(config=config)
+    net.load_state_dict(torch.load('model1.pth'))
+    net.to(config['gpu'])
+    valid_dataset = torch.utils.data.TensorDataset(torch.from_numpy(val_features), torch.from_numpy(val_labels))
+    valLoader = DataLoader(valid_dataset, batch_size = config['batch_size'], shuffle=False)
+
+    for i, (x,y) in enumerate(valLoader):
+        samples_x = x
+        samples_y = y
+        samples_x_np = samples_x.numpy()
+        samples_y_np = samples_y.numpy()
+        print("Shape X: ", samples_x.shape)
+        print("Shape y: ", samples_y.shape)
+        if i == 1:
+            break
+    batches = len(samples_x_np)
+    print("Example of one sample data: ", samples_x_np[5,:,0])
+    print("Label: ", samples_y_np[5])
+
+    #Unscaling the data using the scaler object
+    samples_x_np_flat = samples_x_np.flatten().reshape(-1,1)
+    sample_unnorm_np = scaler.inverse_transform(samples_x_np_flat)
+    sample_unnorm_np = sample_unnorm_np.reshape(batches, -1, 1)
+
+    print("unscaled values: ", sample_unnorm_np[5,:,0])
+    print("Average of the unscaled values, ", np.mean(sample_unnorm_np[5,:,0]))
+
+    #Getting the predictions
+    net.eval()
+    with torch.no_grad():
+        inputs, targets = samples_x.to(config['gpu']), samples_y.to(config['gpu'])
+
+        val_output = net(inputs)    #forwards pass
+
+        val_output = torch.nn.functional.softmax(val_output, dim=1)
+
+        y_preds = np.argmax(val_output.cpu().numpy(), axis=-1)
+        y_true = targets.cpu().numpy().flatten()
+
+    print("predicted labels: ", y_preds)
+    print("true labels: ", y_true)
 
 class Dataloader():
     """Following class has as responsabilities to get the data coming from the dataset.
@@ -554,7 +647,7 @@ def test1DLForHAR():
                 elapsed = time.time() - start_time
                 print('| epoch {:3d} | {:5d} batches | ms/batch {:5.2f} | train loss {:5.2f}'.format(e, batch_num, elapsed * 1000 / config['batch_size'], cur_loss))
                 start_time = time.time()
-                batch_num += 1
+            batch_num += 1
             
             #print(i)
 
