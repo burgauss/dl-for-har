@@ -31,12 +31,12 @@ config = {
     'nb_conv_blocks': 2,
     'conv_block_type': 'normal',
     'nb_filters': 64,
-    'filter_width': 5,
+    'filter_width': 3,
     'nb_units_lstm': 128,
     'nb_layers_lstm': 1,
     'drop_prob': 0.5,
     # training settings
-    'epochs': 10,
+    'epochs': 30,
     'batch_size': 10,
     'loss': 'cross_entropy',
     'weighted': False,
@@ -78,7 +78,7 @@ def main():
     dataLoader = Dataloader(pathAll)        #get the data
     # Data processing
     dataset, waveIndexBegin, waveIndexEnding = dataLoader.processData() 
-    X_train, X_test, y_train, y_test = getWindowedSplitData(dataset, waveIndexBegin, waveIndexEnding, tStepLeftShift=-5, tStepRightShift=15, expectedWavesSizes=windowSizes)
+    X_train, X_test, y_train, y_test = getWindowedSplitData(dataset, waveIndexBegin, waveIndexEnding, tStepLeftShift=0, tStepRightShift=15, expectedWavesSizes=windowSizes)
     X_train_ss, X_test_ss, mm = MinMaxNormalization(X_train, X_test)             # Rescaling
     
     print("X_train shape: ", X_train_ss.shape, "X_test_shape", X_test_ss.shape)
@@ -111,20 +111,8 @@ def main():
     #    network=net, optimizer=opt, loss=loss, config=config, log_date=log_date,
     #    log_timestamp=log_timestamp)
     
-    # torch.save(net.state_dict(), './model1.pth')
-
+    # torch.save(net.state_dict(), './model2.pth')
     
-    # Quick validation
-
-    # net.load_state_dict(torch.load('model1.pth'))
-    # mySample = X_test_ss[2,:,:]
-    # mySampleNew = mySample.reshape(mySample.shape[0], mySample.shape[1], 1)
-    # myLabel = y_test[2]
-    # mySample_Unnormalized = mm.inverse_transform(mySample)
-    # print(mySample_Unnormalized.squeeze())
-    # print(myLabel)
-    # #prediction = net(mySampleNew)
-    # #print(prediction)
     #test1DLForHAR()
 
     validation_simplified(X_test_ss, y_test, mm)
@@ -298,6 +286,7 @@ def train_validate_simplified(train_features, train_labels, val_features, val_la
                 "Val F1: {:.4f}".format(f1_score(val_gt, val_preds, average='macro')))
         
         network.train()
+    return network
 
 def validation_simplified(val_features, val_labels, scaler):
     """Function gets a saved model and takes one batch to make predictions
@@ -306,7 +295,7 @@ def validation_simplified(val_features, val_labels, scaler):
     """
     #upload the model
     net = DeepConvLSTM_Simplified(config=config)
-    net.load_state_dict(torch.load('model1.pth'))
+    net.load_state_dict(torch.load('model2.pth'))
     net.to(config['gpu'])
     valid_dataset = torch.utils.data.TensorDataset(torch.from_numpy(val_features), torch.from_numpy(val_labels))
     valLoader = DataLoader(valid_dataset, batch_size = config['batch_size'], shuffle=False)
