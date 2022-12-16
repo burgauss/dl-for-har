@@ -293,8 +293,8 @@ def train(train_features, train_labels, val_features, val_labels, network, optim
     if config['weighted']:
         class_weights = torch.from_numpy(
             # 09122022 In train no class 0 exists, so we comment out the next line
-            #compute_class_weight('balanced', classes=np.unique(train_labels + 1), y=train_labels + 1)).float()
-            compute_class_weight('balanced', classes=np.unique(train_labels), y=train_labels)).float()
+            compute_class_weight('balanced', classes=np.unique(train_labels + 1), y=train_labels + 1)).float()
+            #compute_class_weight('balanced', classes=np.unique(train_labels), y=train_labels)).float()
         if config['loss'] == 'cross_entropy':
             loss.weight = class_weights.cuda()
         print('Applied weighted class weights: ')

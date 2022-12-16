@@ -99,7 +99,7 @@ def main():
     #Calling the model
     
     net = DeepConvLSTM_Simplified(config=config)
-
+    #net = DeepConvLSTM(config=config)
     loss = torch.nn.CrossEntropyLoss()
     opt = torch.optim.Adam(net.parameters(), lr=config['lr'], weight_decay=config["weight_decay"])
     
@@ -115,7 +115,7 @@ def main():
     
     #test1DLForHAR()
 
-    validation_simplified(X_test_ss, y_test, mm)
+    #validation_simplified(X_test_ss, y_test, mm)
 
 def train_simplified(train_features, train_labels, val_features, val_labels,
         network, optimizer, loss, config, log_date, log_timestamp):
